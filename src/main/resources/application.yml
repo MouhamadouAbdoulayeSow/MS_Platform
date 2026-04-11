@@ -70,6 +70,17 @@ spring:
     listener:
       ack-mode: manual_immediate
       poll-timeout: 30000
+  mail:
+    host: localhost
+    port: 25
+    username: ""
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
 # JWT Configuration
 jwt:
@@ -110,6 +121,17 @@ spring:
   h2:
     console:
       enabled: false
+  mail:
+    host: localhost
+    port: 25
+    username: "mamadou"
+    password: "Sowane02"
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
 # Swagger/OpenAPI
 springdoc:
