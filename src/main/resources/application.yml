@@ -85,7 +85,7 @@ spring:
 # JWT Configuration
 jwt:
   # Générer avec: openssl rand -base64 32
-  secret: ${JWT_SECRET:}
+  secret: ${JWT_SECRET:MyS3cur3JWTSecretKey2024ForLMSPlatformBase64Encoded}
   access-expiration: 900000  # 15 minutes en millisecondes
   refresh-expiration: 604800000  # 7 jours en millisecondes
 
@@ -122,16 +122,16 @@ spring:
     console:
       enabled: false
   mail:
-    host: localhost
-    port: 25
-    username: "mamadou"
-    password: "Sowane02"
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME:your-email@gmail.com}
+    password: ${GMAIL_PASSWORD:your-app-password}
     properties:
       mail:
         smtp:
-          auth: false
+          auth: true
           starttls:
-            enable: false
+            enable: true
 
 # Swagger/OpenAPI
 springdoc:
@@ -143,6 +143,12 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+# Management for development
+management:
+  health:
+    mail:
+      enabled: false
 
 # Logging for development
 logging:
@@ -203,4 +209,7 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  health:
+    mail:
+      enabled: false
 

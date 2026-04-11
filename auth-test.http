@@ -13,8 +13,8 @@ POST {{baseUrl}}/auth/register
 Content-Type: {{contentType}}
 
 {
-  "nom": "Jean Dupont",
-  "email": "jean.dupont@example.com",
+  "nom": "Jean Paul",
+  "email": "jean.paul@example.com",
   "motDePasse": "Password123!",
   "role": "ETUDIANT"
 }
@@ -24,8 +24,8 @@ POST {{baseUrl}}/auth/register
 Content-Type: {{contentType}}
 
 {
-  "nom": "Marie Curie",
-  "email": "marie.curie@example.com",
+  "nom": "Marie diiop",
+  "email": "marie.diop@example.com",
   "motDePasse": "Password123!",
   "role": "PROFESSEUR"
 }
