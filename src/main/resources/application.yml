@@ -1,18 +1,10 @@
 # Base configuration
-server:
-  error:
-    include-message: never
-    include-stacktrace: never
-    include-binding-errors: never
 spring:
   application:
     name: ms-platform
   threads:
     virtual:
       enabled: true
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
   datasource:
     url: jdbc:postgresql://localhost:5432/lms_platform
     username: ${DB_USERNAME:postgres}
@@ -41,29 +33,59 @@ spring:
     baseline-on-migrate: true
     locations: classpath:db/migration
     baseline-version: 1
-data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
-      timeout: 2000ms
-      lettuce:
+    data:
+     redis:
+       host: ${REDIS_HOST:localhost}
+       port: ${REDIS_PORT:6379}
+       password: ${REDIS_PASSWORD:}
+       timeout: 2000ms
+       lettuce:
         pool:
           max-active: 8
           max-idle: 8
           min-idle: 0
-#  kafka:
-#    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-#    producer:
-#      acks: all
-#      retries: 3
-#      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-#      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      retries: 3
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        request.timeout.ms: 30000
+        delivery.timeout.ms: 120000
+        max.block.ms: 60000
+    consumer:
+      group-id: ms-platform-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        session.timeout.ms: 30000
+        heartbeat.interval.ms: 10000
+        max.poll.records: 100
+        max.poll.interval.ms: 300000
+        spring.json.trusted.packages: "*"
+    listener:
+      ack-mode: manual_immediate
+      poll-timeout: 30000
+  mail:
+    host: localhost
+    port: 25
+    username: ""
+    password: ""
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
 
 # JWT Configuration
 jwt:
   # Générer avec: openssl rand -base64 32
-  secret: ${JWT_SECRET:}
+  secret: ${JWT_SECRET:MyS3cur3JWTSecretKey2024ForLMSPlatformBase64Encoded}
   access-expiration: 900000  # 15 minutes en millisecondes
   refresh-expiration: 604800000  # 7 jours en millisecondes
 
@@ -99,6 +121,17 @@ spring:
   h2:
     console:
       enabled: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GMAIL_USERNAME:your-email@gmail.com}
+    password: ${GMAIL_PASSWORD:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 # Swagger/OpenAPI
 springdoc:
@@ -110,6 +143,12 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+# Management for development
+management:
+  health:
+    mail:
+      enabled: false
 
 # Logging for development
 logging:
@@ -123,25 +162,25 @@ logging:
 
 ---
 # Production profile
-#spring:
-#  config:
-#    activate:
-#      on-profile: prod
-#  jpa:
-#    show-sql: false
-#    hibernate:
-#      ddl-auto: validate
-#  datasource:
-#    url: ${DATABASE_URL}
-#    username: ${DATABASE_USERNAME}
-#    password: ${DATABASE_PASSWORD}
-#  data:
-#    redis:
-#      host: ${REDIS_HOST}
-#      port: ${REDIS_PORT}
-#      password: ${REDIS_PASSWORD}
-#  kafka:
-#    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
 
 # Swagger disabled in production
 springdoc:
@@ -170,10 +209,7 @@ management:
   endpoint:
     health:
       show-details: when-authorized
-  metrics:
-    export:
-      prometheus:
-        enabled: true
   health:
-    redis:
-      enabled: true
+    mail:
+      enabled: false
+

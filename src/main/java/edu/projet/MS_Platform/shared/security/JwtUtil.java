@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import edu.projet.MS_Platform.shared.exception.AppErrorCode;
 import edu.projet.MS_Platform.shared.exception.AppException;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.util.Date;
@@ -36,7 +36,16 @@ public class JwtUtil {
         if (secret == null || secret.trim().isEmpty()) {
             throw new IllegalStateException("JWT_SECRET manquant");
         }
-        this.signingKey = Keys.hmacShaKeyFor(java.util.Base64.getDecoder().decode(secret));
+        byte[] keyBytes;
+        try {
+            keyBytes = java.util.Base64.getDecoder().decode(secret);
+        } catch (IllegalArgumentException e) {
+            keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        }
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET doit faire au moins 256 bits (32 octets)");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     }
     
     public String generateAccessToken(UUID userId, String role, String email) {

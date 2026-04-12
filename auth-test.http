@@ -1,0 +1,309 @@
+### MS Platform Authentication API Tests
+### Base URL: http://localhost:8080
+
+@baseUrl = http://localhost:8080
+@contentType = application/json
+
+# ============================================
+# AUTHENTICATION ENDPOINTS
+# ============================================
+
+### 1. Register a new user (ETUDIANT)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "Jean Dupont",
+  "email": "jean.dupont@example.com",
+  "motDePasse": "Password123!",
+  "role": "ETUDIANT"
+}
+
+### 2. Register a new user (PROFESSEUR)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "Marie Curie",
+  "email": "marie.curie@example.com",
+  "motDePasse": "Password123!",
+  "role": "PROFESSEUR"
+}
+
+### 3. Try to register an ADMIN (should fail - forbidden)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "Admin User",
+  "email": "admin@example.com",
+  "motDePasse": "Password123!",
+  "role": "ADMIN"
+}
+
+### 4. Login with valid credentials (ETUDIANT)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "jean.dupont@example.com",
+  "motDePasse": "Password123!"
+}
+
+> {%
+// Store tokens for subsequent requests
+if (response.status === 200) {
+    client.global.set("accessToken", response.body.accessToken);
+    client.global.set("refreshToken", response.body.refreshToken);
+    client.global.set("tokenType", response.body.tokenType);
+}
+%}
+
+### 5. Login with valid credentials (PROFESSEUR)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "marie.curie@example.com",
+  "motDePasse": "Password123!"
+}
+
+> {%
+// Store professor tokens
+if (response.status === 200) {
+    client.global.set("professorAccessToken", response.body.accessToken);
+    client.global.set("professorRefreshToken", response.body.refreshToken);
+}
+%}
+
+### 6. Login with invalid credentials (should fail)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "jean.dupont@example.com",
+  "motDePasse": "WrongPassword123!"
+}
+
+### 7. Login with non-existent user (should fail)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "nonexistent@example.com",
+  "motDePasse": "Password123!"
+}
+
+### 8. Get current user profile (requires authentication)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+
+### 9. Update user profile (requires authentication)
+PUT {{baseUrl}}/auth/me
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "nom": "Jean Dupont Updated",
+  "avatar": "https://example.com/avatar.jpg",
+  "niveau": "Avancé"
+}
+
+### 10. Change password (requires authentication)
+PUT {{baseUrl}}/auth/me/password
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "currentPassword": "Password123!",
+  "newPassword": "NewPassword123!"
+}
+
+### 11. Refresh access token
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+> {%
+// Update access token with new one
+if (response.status === 200) {
+    client.global.set("accessToken", response.body.accessToken);
+    client.global.set("refreshToken", response.body.refreshToken);
+}
+%}
+
+### 12. Try refresh with invalid token (should fail)
+POST {{baseUrl}}/auth/refresh
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "invalid-refresh-token"
+}
+
+### 13. Forgot password for existing user
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: {{contentType}}
+
+{
+  "email": "jean.dupont@example.com"
+}
+
+### 14. Forgot password for non-existing user (should return same message for security)
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: {{contentType}}
+
+{
+  "email": "nonexistent@example.com"
+}
+
+### 15. Try to access protected endpoint without token (should fail)
+GET {{baseUrl}}/auth/me
+
+### 16. Try to access protected endpoint with invalid token (should fail)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer invalid-token
+
+### 17. Logout (requires authentication)
+POST {{baseUrl}}/auth/logout
+Content-Type: {{contentType}}
+Authorization: Bearer {{accessToken}}
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+### 18. Try to use token after logout (should fail)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{accessToken}}
+
+# ============================================
+# EDGE CASES AND VALIDATION TESTS
+# ============================================
+
+### 19. Register with invalid email (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "Test User",
+  "email": "invalid-email",
+  "motDePasse": "Password123!",
+  "role": "ETUDIANT"
+}
+
+### 20. Register with weak password (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "Test User",
+  "email": "test.weak@example.com",
+  "motDePasse": "weak",
+  "role": "ETUDIANT"
+}
+
+### 21. Register with missing fields (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "",
+  "email": "test.empty@example.com",
+  "motDePasse": "Password123!",
+  "role": "ETUDIANT"
+}
+
+### 22. Login with missing fields (should fail)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "",
+  "motDePasse": "Password123!"
+}
+
+### 23. Update profile with invalid data (should fail)
+PUT {{baseUrl}}/auth/me
+Content-Type: {{contentType}}
+Authorization: Bearer {{professorAccessToken}}
+
+{
+  "nom": "A",  // Too short
+  "avatar": "invalid-url",
+  "niveau": ""
+}
+
+### 24. Change password with wrong current password (should fail)
+PUT {{baseUrl}}/auth/me/password
+Content-Type: {{contentType}}
+Authorization: Bearer {{professorAccessToken}}
+
+{
+  "currentPassword": "WrongPassword123!",
+  "newPassword": "NewPassword123!"
+}
+
+### 25. Register duplicate user (should fail)
+POST {{baseUrl}}/auth/register
+Content-Type: {{contentType}}
+
+{
+  "nom": "Another Jean",
+  "email": "jean.dupont@example.com",  // Already exists
+  "motDePasse": "Password123!",
+  "role": "ETUDIANT"
+}
+
+# ============================================
+# RATE LIMITING TESTS
+# ============================================
+
+### 26. Multiple login attempts to test rate limiting (run multiple times quickly)
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "jean.dupont@example.com",
+  "motDePasse": "WrongPassword123!"
+}
+
+### 27. Multiple login attempts with different email to test rate limiting
+POST {{baseUrl}}/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "test.ratelimit@example.com",
+  "motDePasse": "WrongPassword123!"
+}
+
+# ============================================
+# HEALTH AND SYSTEM CHECKS
+# ============================================
+
+### 28. Check application health
+GET {{baseUrl}}/actuator/health
+
+### 29. Check Swagger UI is accessible
+GET {{baseUrl}}/swagger-ui.html
+
+### 30. Check API docs are accessible
+GET {{baseUrl}}/api-docs
+
+# ============================================
+# CLEANUP TESTS (run at the end)
+# ============================================
+
+### 31. Logout professor account
+POST {{baseUrl}}/auth/logout
+Content-Type: {{contentType}}
+Authorization: Bearer {{professorAccessToken}}
+
+{
+  "refreshToken": "{{professorRefreshToken}}"
+}
+
+### 32. Final health check after all tests
+GET {{baseUrl}}/actuator/health
