@@ -8,7 +8,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/lms_platform
     username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:Sowane02}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -85,7 +85,7 @@ spring:
 # JWT Configuration
 jwt:
   # Générer avec: openssl rand -base64 32
-  secret: ${JWT_SECRET:MyS3cur3JWTSecretKey2024ForLMSPlatformBase64Encoded}
+  secret: ${JWT_SECRET}
   access-expiration: 900000  # 15 minutes en millisecondes
   refresh-expiration: 604800000  # 7 jours en millisecondes
 
@@ -116,8 +116,8 @@ spring:
       ddl-auto: update
   datasource:
     url: jdbc:postgresql://localhost:5432/lms_platform
-    username: postgres
-    password: Sowane02
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
   h2:
     console:
       enabled: false

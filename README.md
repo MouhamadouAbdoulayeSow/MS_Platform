@@ -15,9 +15,20 @@ A Spring Boot microservices platform for Learning Management System (LMS) with K
 Create PostgreSQL database:
 ```sql
 CREATE DATABASE lms_platform;
-CREATE USER postgres WITH PASSWORD 'Sowane02';
+CREATE USER postgres WITH PASSWORD '<your-db-password>';
 GRANT ALL PRIVILEGES ON DATABASE lms_platform TO postgres;
 ```
+
+### Environment variables
+Secrets are read from the environment, never from the repository:
+```bash
+export DB_USERNAME=postgres
+export DB_PASSWORD=<your-db-password>
+export JWT_SECRET=$(openssl rand -base64 32)
+export GMAIL_USERNAME=<sender-address>   # optional, for password-reset e-mails
+export GMAIL_PASSWORD=<app-password>
+```
+A template is provided in `.env.example`.
 
 ## Infrastructure Setup
 
