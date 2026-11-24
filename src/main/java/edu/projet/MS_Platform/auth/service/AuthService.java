@@ -185,14 +185,8 @@ public class AuthService {
                 throw new AppException(ACCOUNT_INACTIVE, "Compte inactif");
             }
 
-            // Générer nouveaux tokens
-            AuthResponse response = generateAuthResponse(user);
-
-            // Stocker le nouveau refresh token
-            String newJti = jwtUtil.extractJti(response.refreshToken());
-            redisTemplate.opsForValue().set("refresh:" + newJti, userId, 7L, TimeUnit.DAYS);
-
-            return response;
+            // Générer nouveaux tokens ; generateAuthResponse stocke déjà le nouveau refresh token dans Redis
+            return generateAuthResponse(user);
 
         } catch (Exception e) {
             if (e instanceof AppException) {

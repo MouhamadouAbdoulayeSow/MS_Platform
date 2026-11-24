@@ -160,6 +160,18 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 - Swagger UI available at http://localhost:8080/swagger-ui.html
 - Health check at http://localhost:8080/actuator/health
 
+## Tests
+
+```bash
+./mvnw test
+```
+36 tests, JUnit 5:
+- `AuthServiceTest`, 15 unit tests with Mockito: registration, login with rate limiting, account lock and timing-attack protection, token refresh rotation, logout blacklisting, password reset.
+- `AuthControllerTest`, 19 web layer tests with `@WebMvcTest` and MockMvc: the real security configuration and JWT filter are loaded; covers validation errors, 401 without or with a revoked token, 429 and the authenticated endpoints.
+- `MsPlatformApplicationTests`, integration tests with Testcontainers: the application starts against real PostgreSQL, Redis and Kafka containers, Flyway migrates the schema and Hibernate validates it. Docker must be running.
+
+Requires JDK 25.
+
 ## Troubleshooting
 
 ### Common Issues

@@ -1,18 +1,23 @@
 // Package: edu.projet.MS_Platform.auth.controller
 package edu.projet.MS_Platform.auth.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import edu.projet.MS_Platform.auth.dto.*;
 import edu.projet.MS_Platform.auth.entity.Role;
 import edu.projet.MS_Platform.auth.service.AuthService;
 import edu.projet.MS_Platform.shared.exception.AppException;
 import edu.projet.MS_Platform.shared.exception.AppErrorCode;
+import edu.projet.MS_Platform.shared.config.SecurityConfig;
+import edu.projet.MS_Platform.shared.security.JwtUtil;
+import io.jsonwebtoken.Claims;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
@@ -20,20 +25,34 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+/**
+ * Web layer tests: the real SecurityConfig and JwtAuthFilter are loaded,
+ * the service, JWT utility and Redis are mocked.
+ */
 @WebMvcTest(AuthController.class)
+@Import(SecurityConfig.class)
 class AuthControllerTest {
+
+    private static final String VALID_TOKEN = "valid-token";
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private JwtUtil jwtUtil;
+
+    @MockitoBean
+    private RedisTemplate<String, String> redisTemplate;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -52,6 +71,15 @@ class AuthControllerTest {
         testAuthResponse = new AuthResponse(
                 "accessToken", "refreshToken", "Bearer", 900, testUserProfile
         );
+
+        // Any Bearer token is accepted by the JWT filter as the test user
+        Claims claims = mock(Claims.class);
+        when(claims.getIssuer()).thenReturn("lms-platform");
+        when(jwtUtil.extractAllClaims(anyString())).thenReturn(claims);
+        when(jwtUtil.extractJti(anyString())).thenReturn("jti");
+        when(jwtUtil.extractUserId(anyString())).thenReturn(testUserId.toString());
+        when(jwtUtil.extractRole(anyString())).thenReturn("ETUDIANT");
+        when(redisTemplate.hasKey(anyString())).thenReturn(false);
     }
 
     @Test
@@ -86,7 +114,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fields.motDePasse").exists());
 
         verify(authService, never()).register(any());
     }
@@ -243,16 +272,30 @@ class AuthControllerTest {
         // When & Then
         mockMvc.perform(get("/auth/me")
                         .with(csrf())
-                        .header("Authorization", "Bearer valid-token"))
+                        .header("Authorization", "Bearer " + VALID_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(testUserId.toString()))
                 .andExpect(jsonPath("$.email").value("test@example.com"));
 
-        verify(authService).getMe(any());
+        verify(authService).getMe(testUserId);
     }
 
     @Test
-    @WithMockUser
+    void getMe_revokedToken_returns401() throws Exception {
+        // Given
+        when(redisTemplate.hasKey("blacklist:jti")).thenReturn(true);
+
+        // When & Then
+        mockMvc.perform(get("/auth/me")
+                        .header("Authorization", "Bearer " + VALID_TOKEN))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.errorCode").value("TOKEN_REVOKED"))
+                .andExpect(jsonPath("$.timestamp").exists());
+
+        verify(authService, never()).getMe(any());
+    }
+
+    @Test
     void updateMe_withAuthenticatedUser_returns200() throws Exception {
         // Given
         UpdateProfileRequest req = new UpdateProfileRequest("Updated Name", "http://new-avatar.com", "L2");
@@ -265,6 +308,7 @@ class AuthControllerTest {
         // When & Then
         mockMvc.perform(put("/auth/me")
                         .with(csrf())
+                        .header("Authorization", "Bearer " + VALID_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
@@ -276,7 +320,6 @@ class AuthControllerTest {
     }
 
     @Test
-    @WithMockUser
     void changePassword_withAuthenticatedUser_returns204() throws Exception {
         // Given
         ChangePasswordRequest req = new ChangePasswordRequest("CurrentPassword123!", "NewPassword123!");
@@ -285,6 +328,7 @@ class AuthControllerTest {
         // When & Then
         mockMvc.perform(put("/auth/me/password")
                         .with(csrf())
+                        .header("Authorization", "Bearer " + VALID_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isNoContent());
@@ -293,7 +337,6 @@ class AuthControllerTest {
     }
 
     @Test
-    @WithMockUser
     void logout_withAuthenticatedUser_returns204() throws Exception {
         // Given
         RefreshRequest req = new RefreshRequest("refresh-token");

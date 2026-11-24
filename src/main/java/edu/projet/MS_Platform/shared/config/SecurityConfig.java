@@ -2,7 +2,7 @@
 
 package edu.projet.MS_Platform.shared.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -46,11 +46,6 @@ public class SecurityConfig {
     private String[] allowedOrigins;
     
     @Bean
-    public ObjectMapper objectMapper() {
-        return new ObjectMapper();
-    }
-    
-    @Bean
     public JwtAuthFilter jwtAuthFilter(JwtUtil jwtUtil, 
                                        org.springframework.data.redis.core.RedisTemplate<String, String> redisTemplate,
                                        ObjectMapper objectMapper) {
@@ -68,7 +63,8 @@ public class SecurityConfig {
     }
     
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter,
+                                                   ObjectMapper objectMapper) throws Exception {
         return http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -82,8 +78,8 @@ public class SecurityConfig {
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(exceptions -> exceptions
-                .authenticationEntryPoint(authenticationEntryPoint(objectMapper()))
-                .accessDeniedHandler(accessDeniedHandler(objectMapper()))
+                .authenticationEntryPoint(authenticationEntryPoint(objectMapper))
+                .accessDeniedHandler(accessDeniedHandler(objectMapper))
             )
             .build();
     }

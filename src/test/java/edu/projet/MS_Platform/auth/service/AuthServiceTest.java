@@ -8,6 +8,7 @@ import edu.projet.MS_Platform.auth.mapper.UserMapper;
 import edu.projet.MS_Platform.auth.repository.UserRepository;
 import edu.projet.MS_Platform.shared.exception.AppException;
 import edu.projet.MS_Platform.shared.security.JwtUtil;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,9 +17,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -77,7 +83,13 @@ class AuthServiceTest {
                 .failedAttempts(0)
                 .build();
 
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        // Lenient: some tests fail before Redis is used
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -162,7 +174,8 @@ class AuthServiceTest {
         // When & Then
         AppException exception = assertThrows(AppException.class, () -> authService.login(req, "127.0.0.1"));
         assertEquals(INVALID_CREDENTIALS, exception.getErrorCode());
-        verify(testUser).setFailedAttempts(1);
+        assertEquals(1, testUser.getFailedAttempts());
+        verify(userRepository).save(testUser);
     }
 
     @Test
@@ -196,12 +209,15 @@ class AuthServiceTest {
         LoginRequest req = new LoginRequest("nonexistent@example.com", testPassword);
         when(userRepository.findByEmail("nonexistent@example.com")).thenReturn(Optional.empty());
         when(valueOps.increment(anyString())).thenReturn(1L);
+        // Run the @PostConstruct that computes the dummy hash, as Spring would
+        when(passwordEncoder.encode("lms_dummy_timing")).thenReturn("dummyHash");
+        ReflectionTestUtils.invokeMethod(authService, "init");
 
         // When
         assertThrows(AppException.class, () -> authService.login(req, "127.0.0.1"));
 
         // Then - Vérifier que BCrypt est appelé même si l'utilisateur n'existe pas
-        verify(passwordEncoder).matches(eq(testPassword), anyString()); // DUMMY_HASH
+        verify(passwordEncoder).matches(testPassword, "dummyHash");
     }
 
     @Test
@@ -263,6 +279,8 @@ class AuthServiceTest {
         when(jwtUtil.extractJti(accessToken)).thenReturn(accessJti);
         when(jwtUtil.extractJti(refreshToken)).thenReturn(refreshJti);
         when(jwtUtil.getRemainingTtlMillis(accessToken)).thenReturn(1000L);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(testUserId.toString(), null, List.of()));
 
         // When
         authService.logout(accessToken, refreshToken);
@@ -280,7 +298,7 @@ class AuthServiceTest {
 
         // When & Then - Aucune exception ne doit être levée
         assertDoesNotThrow(() -> authService.forgotPassword(testEmail));
-        verify(mailSender, never()).send(any());
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
 
     @Test
@@ -299,7 +317,7 @@ class AuthServiceTest {
         // Then
         verify(redisTemplate).delete("reset:" + token);
         verify(passwordEncoder).encode("NewPassword123!");
-        verify(testUser).setMotDePasse("newHashedPassword");
+        assertEquals("newHashedPassword", testUser.getMotDePasse());
         verify(userRepository).save(testUser);
     }
 
